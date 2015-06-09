@@ -1,0 +1,61 @@
+#!/bin/bash
+# Sebastian Batalla
+
+
+
+###ATRIBUTES####
+LDAPSERVER=
+LDAPPORT=389
+LDAP_ROOTDN="uid=zimbra,cn=admins,cn=zimbra"
+LDAP_PASSWD=
+
+
+CONFIGFILE=/root/ejabberd.yml
+TFILE="/tmp/$(basename $0).$$.tmp"
+
+
+function usage
+{
+    echo "usage: zmjabberdomain [[[-d domain ] | [-h]]"
+}
+
+
+
+while [ "$1" != "" ]; do
+    case $1 in
+        -d | --domain )           shift
+                                DOMAIN=$1
+                                ;;
+        -h | --help )           usage
+                                exit
+                                ;;
+        * )                     usage
+                                exit 1
+    esac
+    shift
+done
+
+DOTS=$(echo "$DOMAIN" | awk -F. '{ print NF - 1 }')
+
+if [ $DOTS -eq 1 ] ; then
+	DC1=$(echo "$DOMAIN" | awk -F. '{ print $1 }')
+	DC2=$(echo "$DOMAIN" | awk -F. '{ print $2 }')
+	LDAP_BASE="dc=$DC1,dc=$DC2"
+elif [ $DOTS -eq 2 ]; then
+        DC1=$(echo "$DOMAIN" | awk -F. '{ print $1 }')
+        DC2=$(echo "$DOMAIN" | awk -F. '{ print $2 }')
+        DC3=$(echo "$DOMAIN" | awk -F. '{ print $3 }')
+        LDAP_BASE="dc=$DC1,dc=$DC2,dc=$DC3"
+else
+	echo "ERROR DE SINTAXIS EN EL DOMINIO /!\\"
+	exit
+fi
+
+
+PARAGRAPH="host_config:\n\t\"$DOMAIN\":\n\tauth_method: ldap\n\tldap_servers:\n\t\t- \"$LDAPSERVER\"\n\tldap_uids:\n\t\t- \"uid\"\n\tldap_rootdn: \"$LDAP_ROOTDN\"\n\tldap_password: \"$LDAP_PASSWD\"\n\tldap_base: \"$LDAP_BASE\"\n\tldap_port: $LDAPPORT\n"
+
+sed "/^hosts:/a\  - \"$DOMAIN\"" $CONFIGFILE | sed "/^##       - anonymous/a\\$PARAGRAPH" > $TFILE
+
+
+
+cat $TFILE > $CONFIGFILE
